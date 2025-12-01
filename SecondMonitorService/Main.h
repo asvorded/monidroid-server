@@ -19,6 +19,13 @@ struct ClientInfo {
 		hertz(-1),
 		hCommunicationThread(nullptr)
 	{}
+	ClientInfo() : ClientInfo(INVALID_SOCKET) {}
+	~ClientInfo() {
+		if (clientSocket != INVALID_SOCKET) {
+			shutdown(clientSocket, SD_BOTH);
+			closesocket(clientSocket);
+		}
+	}
 
 	void SetupClient(int width, int height, int hertz) {
 		this->width = width;

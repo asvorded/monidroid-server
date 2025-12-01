@@ -6,6 +6,7 @@
 
 #include <iostream>
 #include <list>
+#include <array>
 
 #include <Windows.h>
 #include <ws2tcpip.h>
@@ -45,7 +46,6 @@ void ServiceMain(DWORD argc, LPWSTR* argv);
 void AppMain();
 DWORD CommunicationMain(void* clientInfo);
 DWORD EchoMain(void* unused);
-DWORD EchoMain2(void* unused);
 void HandleCreateThreadFailure(ClientInfo* pClientInfo);
 void HandlerProc(DWORD dwControl);
 
@@ -435,9 +435,8 @@ void AppMain() {
 			clients.push_back(pClientInfo);
 			LeaveCriticalSection(&syncRoot);
 
-			hCommunicationThread = CreateThread(NULL, 0, CommunicationMain, (void*)pClientInfo, 0, NULL);
-			if (hCommunicationThread != NULL) {
-			} else {
+			hCommunicationThread = CreateThread(NULL, 0, CommunicationMain, pClientInfo, 0, NULL);
+			if (hCommunicationThread == NULL) {
 				HandleCreateThreadFailure(pClientInfo);
 			}
 		} else {
@@ -542,7 +541,7 @@ DWORD DisconnectMonitor(ClientInfo* pClientInfo) {
 /// Send frames (step 3)
 /// </summary>
 HRESULT SendFrames(ClientInfo* pClientInfo) {
-	D3D_FEATURE_LEVEL featureLevels[] = {
+	std::array<D3D_FEATURE_LEVEL, 7> featureLevels {
 		D3D_FEATURE_LEVEL_11_1,
 		D3D_FEATURE_LEVEL_11_0,
 		D3D_FEATURE_LEVEL_10_1,
@@ -581,7 +580,8 @@ HRESULT SendFrames(ClientInfo* pClientInfo) {
 
 	hr = D3D11CreateDevice(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL,
 		D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-		featureLevels, 7, D3D11_SDK_VERSION, &pDevice0, NULL, &pDeviceContext0
+		featureLevels.data(), static_cast<UINT>(featureLevels.size()),
+		D3D11_SDK_VERSION, &pDevice0, NULL, &pDeviceContext0
 	);
 	if (FAILED(hr)) {
 		goto end;
@@ -805,7 +805,8 @@ HRESULT SendFrames2(ClientInfo* pClientInfo) {
 /// </summary>
 /// <param name="param">Pointer to ClientInfo structure</param>
 DWORD CommunicationMain(void* param) {
-	ClientInfo* pClientInfo = (ClientInfo*)param;
+	ClientInfo* pClientInfo = static_cast<ClientInfo*>(param);
+	param = nullptr;
 	SOCKET clientSocket = pClientInfo->clientSocket;
 	DWORD code;
 
@@ -831,14 +832,12 @@ DWORD CommunicationMain(void* param) {
 	// 4. End communication
 	DisconnectMonitor(pClientInfo);
 end:
-	shutdown(clientSocket, SD_BOTH);
-	closesocket(clientSocket);
-
 	EnterCriticalSection(&syncRoot);
 	clients.remove(pClientInfo);
 	LeaveCriticalSection(&syncRoot);
 
 	CoUninitialize();
+	delete pClientInfo;
 	return 0;
 }
 
@@ -853,78 +852,32 @@ DWORD EchoMain(void* unused) {
 	// Setup buffer with computer name
 	DWORD cCompName = 0;
 	GetComputerNameExW(ComputerNameDnsHostname, NULL, &cCompName);
-	wchar_t* compName = new wchar_t[cCompName];
+	auto compName = std::unique_ptr<wchar_t[]>(new wchar_t[cCompName]);
 	// TODO: Convert computer name to UTF-8 string for compability with Linux platforms
-	GetComputerNameExW(ComputerNameDnsHostname, compName, &cCompName);
+	GetComputerNameExW(ComputerNameDnsHostname, compName.get(), &cCompName);
 
 	int sendBufSize = responseHeaderSize + 4 + cCompName * 2;
-	char* sendBuf = new char[sendBufSize];
-	memcpy(sendBuf, SERVER_ECHO_WORD, responseHeaderSize);
-	memcpy(sendBuf + responseHeaderSize, &cCompName, 4);
-	memcpy(sendBuf + responseHeaderSize + 4, compName, cCompName * 2);
+	auto sendBuf = std::unique_ptr<char[]>(new char[sendBufSize]);
+	memcpy(sendBuf.get(), SERVER_ECHO_WORD, responseHeaderSize);
+	memcpy(sendBuf.get() + responseHeaderSize, &cCompName, 4);
+	memcpy(sendBuf.get() + responseHeaderSize + 4, compName.get(), cCompName * 2);
 
-	char* buf = new char[headerSize];
+	auto buf = std::unique_ptr<char[]>(new char[headerSize]);
 	while (accepting) {
 		sockaddr addr;
 		int addrlen = sizeof(sockaddr);
-		int bytesReceived = recvfrom(echoSocket, buf, headerSize, 0, &addr, &addrlen);
+		int bytesReceived = recvfrom(echoSocket, buf.get(), headerSize, 0, &addr, &addrlen);
 		if (bytesReceived == 0 || bytesReceived == SOCKET_ERROR) {
 			MainDebugPrint(L"recvfrom failed with code %d\n", WSAGetLastError());
 			accepting = false;
-		} else if (bytesReceived == headerSize && memcmp(buf, CLIENT_ECHO_WORD, headerSize) == 0) {
-			int bytesSent = sendto(echoSocket, sendBuf, sendBufSize, 0, &addr, addrlen);
+		} else if (bytesReceived == headerSize && memcmp(buf.get(), CLIENT_ECHO_WORD, headerSize) == 0) {
+			int bytesSent = sendto(echoSocket, sendBuf.get(), sendBufSize, 0, &addr, addrlen);
 			if (bytesSent == SOCKET_ERROR) {
 				accepting = false;
 			}
 		}
 	}
-
-	delete[] buf;
-	delete[] sendBuf;
-	delete[] compName;
-
 	return 0;
-}
-
-/// <summary>
-/// Second version of function for automatic server scanning by clients
-/// </summary>
-DWORD EchoMain2(void* unused) {
-	int headerSize = strlen(SERVER_ECHO_WORD);
-
-	// Setup buffer with computer name
-	DWORD cCompName = 0;
-	GetComputerNameExW(ComputerNameDnsHostname, NULL, &cCompName);
-	wchar_t* compName = new wchar_t[cCompName];
-	GetComputerNameExW(ComputerNameDnsHostname, compName, &cCompName);
-
-	int sendBufSize = headerSize + 4 + cCompName * 2;
-	char* sendBuf = new char[sendBufSize];
-	memcpy(sendBuf, SERVER_ECHO_WORD, headerSize);
-	memcpy(sendBuf + headerSize, &cCompName, 4);
-	memcpy(sendBuf + headerSize + 4, compName, cCompName * 2);
-
-	// setup broadcast address
-	sockaddr_in addr = {};
-	addr.sin_family = AF_INET;
-	addr.sin_port = MONIDROID_PORT;
-	addr.sin_addr.s_addr = INADDR_BROADCAST;
-
-	bool sending = true;
-	WSASetLastError(0);
-	while (sending) {
-		int bytesSent = sendto(echoSocket, sendBuf, sendBufSize, 0, (const sockaddr*)&addr, sizeof(addr));
-		if (bytesSent == SOCKET_ERROR || bytesSent == 0) {
-			sending = false;
-		} else {
-			Sleep(5000);
-		}
-	}
-
-	delete[] sendBuf;
-	delete[] compName;
-
-	return WSAGetLastError();
 }
 
 void HandleCreateThreadFailure(ClientInfo* pClientInfo) {
@@ -932,8 +885,6 @@ void HandleCreateThreadFailure(ClientInfo* pClientInfo) {
 	clients.remove(pClientInfo);
 	LeaveCriticalSection(&syncRoot);
 
-	shutdown(pClientInfo->clientSocket, SD_BOTH);
-	closesocket(pClientInfo->clientSocket);
 	delete pClientInfo;
 }
 
