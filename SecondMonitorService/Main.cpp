@@ -4,6 +4,7 @@
 #include "Adapter.h"
 #include "DesktopNotificationManagerCompat.h"
 
+#include <iostream>
 #include <list>
 
 #include <Windows.h>
@@ -73,7 +74,7 @@ CoCreatableClass(NotificationActivator);
 HRESULT InitNotifications() {
 
 	HRESULT hr = DesktopNotificationManagerCompat::RegisterAumidAndComServer(
-		L"MaximDadush.Monidroid", __uuidof(NotificationActivator)
+		L"MaksimDadush.Monidroid", __uuidof(NotificationActivator)
 	);
 	if (SUCCEEDED(hr)) {
 		hr = DesktopNotificationManagerCompat::RegisterActivator();
@@ -205,18 +206,47 @@ void ReportServiceStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWa
 	SetServiceStatus(hServiceStatus, &serviceStatus);
 }
 
+const char* const HelpMessage = MAKE_MONIDROID_VERSION_MESSAGE("Monidroid Windows server version ", "") "\n"
+"Options:\n"
+"--help            Print help" "\n"
+"--install         Install as a Windows service" "\n"
+"--uninstall       Uninstall Windows service" "\n"
+"--no-service      Start as a console application" "\n"
+"\n"
+;
+
 /*
 * ===== ENTRY POINT =====
 */
-int __main(int argc, char** argv) {
+int main(int argc, char** argv) {
 	if (argc == 2) {
-		CHAR* command = argv[1];
-		if (_strcmpi(command, "install") == 0) {
+		std::string command(argv[1]);
+		if (command == "--install") {
 			InstallService();
-		} else if (_strcmpi(command, "uninstall") == 0) {
+		} else if (command == "--uninstall") {
 			UninstallService();
+		} else if (command == "--help") {
+			std::cout << HelpMessage;
+		} else if (command == "--no-service") {
+			std::cout << "Starting..." << '\n';
+
+			int code = InitService();
+
+			if (code != 0) {
+				std::cout << "Error while starting." << '\n';
+				FinalizeService();
+				return -1;
+			}
+
+			std::cout << "Started. Accepting connections..." << '\n';
+
+			AppMain();
+
+			FinalizeService();
+
+			return 0;
 		} else {
-			printf("Unknown command. \"install\" or \"uninstall\" expected.");
+			std::cout << "Unknown option. Use --help to get available options." << '\n';
 		}
 		return 0;
 	}

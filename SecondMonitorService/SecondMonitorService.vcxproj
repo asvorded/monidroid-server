@@ -140,7 +140,6 @@
     <ClCompile Include="DebugOutput.cpp" />
     <ClCompile Include="Installer.cpp" />
     <ClCompile Include="Main.cpp" />
-    <ClCompile Include="Main2.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Adapter.h" />

@@ -5,6 +5,9 @@
 
 #include <WinSock2.h>
 
+#define MONIDROID_SERVICE_VERSION				"0.0.1"
+#define MAKE_MONIDROID_VERSION_MESSAGE(pretext, aftertext)	pretext  MONIDROID_SERVICE_VERSION  aftertext
+
 #define MONIDROID_DEVICE_PATH					L"\\Device\\MonidroidAdapter"
 #define MONIDROID_USER_DEVICE_PATH				L"\\\\.\\GLOBALROOT\\Device\\MonidroidAdapter"
 

@@ -47,17 +47,6 @@ private:
 /// Context for monitor object
 /// </summary>
 struct MonitorContext {
-
-    const std::array<D3D_FEATURE_LEVEL, 7> FeatureLevels {
-        D3D_FEATURE_LEVEL_11_1,
-        D3D_FEATURE_LEVEL_11_0,
-        D3D_FEATURE_LEVEL_10_1,
-        D3D_FEATURE_LEVEL_10_0,
-        D3D_FEATURE_LEVEL_9_3,
-        D3D_FEATURE_LEVEL_9_2,
-        D3D_FEATURE_LEVEL_9_1,
-    };
-
     MonitorContext(IDDCX_MONITOR Monitor);
     ~MonitorContext();
 
