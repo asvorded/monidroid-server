@@ -1,8 +1,8 @@
-#include <stdio.h>
-
 #include "Main.h"
 
-int __main(int argc, char** argv) {
+#include <iostream>
+
+int main(int argc, char** argv) {
 	printf("Starting...\n");
 
 	int code = InitService();

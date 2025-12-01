@@ -1,9 +1,9 @@
 #pragma once
 
-// Driver
+#include <devioctl.h>
 #include <initguid.h>
-#include <guiddef.h>
-#include <devguid.h>
+
+#include <WinSock2.h>
 
 #define MONIDROID_DEVICE_PATH					L"\\Device\\MonidroidAdapter"
 #define MONIDROID_USER_DEVICE_PATH				L"\\\\.\\GLOBALROOT\\Device\\MonidroidAdapter"

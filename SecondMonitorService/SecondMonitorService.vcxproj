@@ -106,6 +106,8 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <LanguageStandard_C>stdc17</LanguageStandard_C>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -135,7 +137,7 @@
   <ItemGroup>
     <ClCompile Include="Adapter.cpp" />
     <ClCompile Include="DesktopNotificationManagerCompat.cpp" />
-    <ClCompile Include="ErrorHandling.cpp" />
+    <ClCompile Include="DebugOutput.cpp" />
     <ClCompile Include="Installer.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Main2.cpp" />
@@ -143,7 +145,7 @@
   <ItemGroup>
     <ClInclude Include="Adapter.h" />
     <ClInclude Include="DesktopNotificationManagerCompat.h" />
-    <ClInclude Include="ErrorHandling.h" />
+    <ClInclude Include="DebugOutput.h" />
     <ClInclude Include="Installer.h" />
     <ClInclude Include="Main.h" />
   </ItemGroup>

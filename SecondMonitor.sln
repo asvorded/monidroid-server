@@ -4,8 +4,14 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.11.35312.102
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MonidroidService", "SecondMonitorService\SecondMonitorService.vcxproj", "{BD3115E2-D8B2-4846-B9F0-AAC69DBAFDE7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D0219630-0D5F-49CE-AFD4-48551F389457} = {D0219630-0D5F-49CE-AFD4-48551F389457}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MonidroidDriver", "MonidroidDriver\MonidroidDriver.vcxproj", "{9A8C91D7-AEE3-481D-BB03-A9EBD44FCE34}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D0219630-0D5F-49CE-AFD4-48551F389457} = {D0219630-0D5F-49CE-AFD4-48551F389457}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MonidroidInfo", "MonidroidInfo\MonidroidInfo.vcxproj", "{D0219630-0D5F-49CE-AFD4-48551F389457}"
 EndProject

@@ -1,10 +1,23 @@
 #include "Main.h"
+
+#include "Installer.h"
+#include "Adapter.h"
 #include "DesktopNotificationManagerCompat.h"
+
+#include <list>
+
+#include <Windows.h>
+#include <ws2tcpip.h>
+#include <iphlpapi.h>
+#include <strsafe.h>
+#include <dxgi1_5.h>
+#include <d3d11_1.h>
+#include <wincodec.h>
+
+#include "../MonidroidInfo/Monidroid.h"
 
 #include <NotificationActivationCallback.h>
 #include <windows.ui.notifications.h>
-
-#include "../MonidroidInfo/Monidroid.h"
 
 using namespace ABI::Windows::Data::Xml::Dom;
 using namespace ABI::Windows::UI::Notifications;
@@ -195,7 +208,7 @@ void ReportServiceStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD dwWa
 /*
 * ===== ENTRY POINT =====
 */
-int main(int argc, char** argv) {
+int __main(int argc, char** argv) {
 	if (argc == 2) {
 		CHAR* command = argv[1];
 		if (_strcmpi(command, "install") == 0) {
@@ -203,7 +216,7 @@ int main(int argc, char** argv) {
 		} else if (_strcmpi(command, "uninstall") == 0) {
 			UninstallService();
 		} else {
-			std::cout << "Unknown command. \"install\" or \"uninstall\" expected.";
+			printf("Unknown command. \"install\" or \"uninstall\" expected.");
 		}
 		return 0;
 	}
@@ -509,7 +522,7 @@ HRESULT SendFrames(ClientInfo* pClientInfo) {
 		D3D_FEATURE_LEVEL_9_1,
 	};
 
-	// Try open driver process to handle duplicationg
+	// Try open driver process to handle duplicating
 	HANDLE hDriverProcess = OpenProcess(PROCESS_DUP_HANDLE, FALSE, pClientInfo->driverProcessId);
 	if (hDriverProcess == NULL) {
 	    return HRESULT_FROM_WIN32(GetLastError());
@@ -580,7 +593,7 @@ HRESULT SendFrames(ClientInfo* pClientInfo) {
 			// Get frame resource		
 			IDXGIResource1* pSharedResource = nullptr;
 			ID3D11Texture2D* pTexture = nullptr;
-			hr = pDevice->OpenSharedResource(hSharedFrame, __uuidof(IDXGIResource1), (void**)&pSharedResource);
+			hr = pDevice->OpenSharedResource1(hSharedFrame, __uuidof(IDXGIResource1), (void**)&pSharedResource);
 			if (FAILED(hr)) {
 				break;
 			}
@@ -782,7 +795,7 @@ DWORD CommunicationMain(void* param) {
 	}
 
 	// 3. Get frames from driver and send to device
-	SendFrames2(pClientInfo);
+	SendFrames(pClientInfo);
 
 
 	// 4. End communication
@@ -811,6 +824,7 @@ DWORD EchoMain(void* unused) {
 	DWORD cCompName = 0;
 	GetComputerNameExW(ComputerNameDnsHostname, NULL, &cCompName);
 	wchar_t* compName = new wchar_t[cCompName];
+	// TODO: Convert computer name to UTF-8 string for compability with Linux platforms
 	GetComputerNameExW(ComputerNameDnsHostname, compName, &cCompName);
 
 	int sendBufSize = responseHeaderSize + 4 + cCompName * 2;

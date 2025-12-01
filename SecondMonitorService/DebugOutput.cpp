@@ -1,4 +1,16 @@
-#include "ErrorHandling.h"
+#include "DebugOutput.h"
+
+#include <Windows.h>
+#include <stdio.h>
+
+void DebugPrint(const wchar_t* format, ...) {
+    wchar_t buffer[1024];
+    va_list args;
+    va_start(args, format);
+    vswprintf(buffer, 1024, format, args);
+    va_end(args);
+    OutputDebugStringW(buffer);
+}
 
 void ConsoleSystemErrorCodeHandler(DWORD code) {
 	char* error = NULL;

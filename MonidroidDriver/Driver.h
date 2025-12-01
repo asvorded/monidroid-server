@@ -1,16 +1,19 @@
 #pragma once
 
-#include <Windows.h>
-#include <WinSock2.h>
-#include <bugcodes.h>
-#include <wudfwdm.h>
-#include <wdf.h>
-#include <winioctl.h>
-#include <wincodec.h>
-#include <IddCx.h>
-#include <avrt.h>
+#pragma warning(disable: 4471, justification: "C4471 appears when driver is compiled with C++20 standard")
 
 #include "../MonidroidInfo/Monidroid.h"
+
+#include <array>
+#include <memory>
+
+#include <wdf.h>
+#include <bugcodes.h>
+#include <IddCx.h>
+#include <Windows.h>
+#include <WinSock2.h>
+#include <wincodec.h>
+#include <avrt.h>
 
 /// <summary>
 /// Context for adapter object
@@ -44,6 +47,17 @@ private:
 /// Context for monitor object
 /// </summary>
 struct MonitorContext {
+
+    const std::array<D3D_FEATURE_LEVEL, 7> FeatureLevels {
+        D3D_FEATURE_LEVEL_11_1,
+        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1,
+        D3D_FEATURE_LEVEL_10_0,
+        D3D_FEATURE_LEVEL_9_3,
+        D3D_FEATURE_LEVEL_9_2,
+        D3D_FEATURE_LEVEL_9_1,
+    };
+
     MonitorContext(IDDCX_MONITOR Monitor);
     ~MonitorContext();
 
@@ -68,7 +82,7 @@ struct MonitorContext {
     HRESULT SendNextFrame();
     void FinalizeFrameSending();
 
-    NTSTATUS OnMonitorDisconnected();
+    //NTSTATUS OnMonitorDisconnected();
 private:
     static DWORD WINAPI MyThreadProc(LPVOID pContext);
     HRESULT ProcessorFunc();

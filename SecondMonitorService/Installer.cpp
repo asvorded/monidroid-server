@@ -2,14 +2,14 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
+#include "Installer.h"
+
+#include "DebugOutput.h"
+#include "../MonidroidInfo/Monidroid.h"
+
 #include <Windows.h>
 #include <strsafe.h>
 #include <winsock2.h>
-
-#include "Installer.h"
-#include "ErrorHandling.h"
-
-#include "../MonidroidInfo/Monidroid.h"
 
 int InstallService() {
     WCHAR szUnquotedPath[MAX_PATH];

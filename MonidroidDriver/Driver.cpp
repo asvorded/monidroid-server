@@ -317,10 +317,10 @@ void EvtIddCxDeviceIoControl(WDFDEVICE Device, WDFREQUEST Request,
     case IOCTL_IDDCX_REQUEST_FRAME:
     {
         status = STATUS_INVALID_PARAMETER;
-        //FRAME_MONITOR_INFO* pFrameInfo = (FRAME_MONITOR_INFO*)inBuf;
-        //status = pContext->pContext->FrameRequest(pFrameInfo);
-        //WdfMemoryCopyFromBuffer(outMemory, 0, inBuf, sizeof(FRAME_MONITOR_INFO));
-        //information = sizeof(FRAME_MONITOR_INFO);
+        FRAME_MONITOR_INFO* pFrameInfo = (FRAME_MONITOR_INFO*)inBuf;
+        status = pContext->pContext->FrameRequest(pFrameInfo);
+        WdfMemoryCopyFromBuffer(outMemory, 0, inBuf, sizeof(FRAME_MONITOR_INFO));
+        information = sizeof(FRAME_MONITOR_INFO);
         break;
     }
     case IOCTL_IDDCX_INIT_FRAME_SEND:
@@ -796,59 +796,13 @@ void MonitorContext::FinalizeProcessor() {
 //}
 
 HRESULT MonitorContext::InitProcessor() {
-    IDXGIFactory5* pFactory = nullptr;
-    HRESULT hr = CreateDXGIFactory2(0, IID_PPV_ARGS(&pFactory));
-    if (FAILED(hr)) {
-        goto end;
-    }
-
-    IDXGIAdapter* pAdapter = nullptr;
-    hr = pFactory->EnumAdapterByLuid(adapterLuid, IID_PPV_ARGS(&pAdapter));
-    if (FAILED(hr)) {
-        goto end;
-    }
-
-    D3D_FEATURE_LEVEL featureLevels[] = {
-        D3D_FEATURE_LEVEL_11_1,
-        D3D_FEATURE_LEVEL_11_0,
-        D3D_FEATURE_LEVEL_10_1,
-        D3D_FEATURE_LEVEL_10_0,
-        D3D_FEATURE_LEVEL_9_3,
-        D3D_FEATURE_LEVEL_9_2,
-        D3D_FEATURE_LEVEL_9_1,
-    };
-
-    ID3D11Device* pDevice0 = nullptr;
-    ID3D11DeviceContext* pDeviceContext0 = nullptr;
-    hr = D3D11CreateDevice(pAdapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, D3D11_CREATE_DEVICE_BGRA_SUPPORT,
-        featureLevels, 7, D3D11_SDK_VERSION, &pDevice0, NULL, &pDeviceContext0
-    );
-    if (FAILED(hr)) {
-        goto end;
-    }
-
-    hr = pDevice0->QueryInterface(IID_PPV_ARGS(&pDevice));
-    if (FAILED(hr)) {
-        goto end;
-    }
-
-    hr = pDeviceContext0->QueryInterface(IID_PPV_ARGS(&pDeviceContext));
-    if (FAILED(hr)) {
-        goto end;
-    }
-
     // Init frames array
     for (int i = 0; i < MAX_FRAMES_COUNT; i++) {
         framesChain[i] = nullptr;
     }
     currentFrame = -1;
 
-end:
-    CoSafeRelease(&pFactory);
-    CoSafeRelease(&pAdapter);
-    CoSafeRelease(&pDevice0);
-    CoSafeRelease(&pDeviceContext0);
-    return hr;
+    return S_OK;
 }
 
 DWORD MonitorContext::StartProcessor() {
@@ -941,7 +895,7 @@ HRESULT MonitorContext::ProcessorMain() {
             desc.Usage = D3D11_USAGE_STAGING;
             desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
             desc.BindFlags = 0;//D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
-            desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED;
+            desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_NTHANDLE;//D3D11_RESOURCE_MISC_SHARED;
 
             // Create display surface copy to pass it to service
             ID3D11Texture2D* pSharedTexture = nullptr;
@@ -991,7 +945,11 @@ HRESULT MonitorContext::GetFrameFromChain(HANDLE* phFrame) {
         hr = E_PENDING;
     } else {
         IDXGIResource1* pFrame = framesChain[currentFrame];
-        hr = pFrame->GetSharedHandle(phFrame);
+        hr = pFrame->CreateSharedHandle(NULL, DXGI_SHARED_RESOURCE_READ, NULL, phFrame);
+
+        IDXGIResource1* pSharedResource = nullptr;
+        pDevice->OpenSharedResource1(*phFrame, IID_PPV_ARGS(&pSharedResource));
+        CoSafeRelease(&pSharedResource);
     }
     LeaveCriticalSection(&syncRoot);
     return hr;
@@ -1038,6 +996,8 @@ HRESULT MonitorContext::SendNextFrame() {
     LeaveCriticalSection(&syncRoot);
 
     // Process frame
+    WICPixelFormatGUID pixelFormatGuid = GUID_WICPixelFormat32bppRGBA;
+
     ID3D11Texture2D* pTexture = nullptr;
     D3D11_TEXTURE2D_DESC desc = {};
     D3D11_MAPPED_SUBRESOURCE mappedResource = {};
@@ -1052,90 +1012,70 @@ HRESULT MonitorContext::SendNextFrame() {
     pTexture->GetDesc(&desc);
 
     hr = pDeviceContext->Map(pTexture, 0, D3D11_MAP_READ, 0, &mappedResource);
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
 
     hr = CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pWicFactory));
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
 
     // --- Create picture
     hr = pWicFactory->CreateBitmapFromMemory(desc.Width, desc.Height,
         GUID_WICPixelFormat32bppRGBA, mappedResource.RowPitch,
         desc.Height * mappedResource.RowPitch, (BYTE*)mappedResource.pData, &pWicBitmap);
-    if (FAILED(hr)) {
-        goto done;
-    }
-    
+    if (FAILED(hr)) { goto end; }
+
     // 1. Create and init encoder
     hr = pWicFactory->CreateEncoder(GUID_ContainerFormatJpeg, nullptr, &pEncoder);
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
 
     // 2. Set up an output buffer
     hr = CreateStreamOnHGlobal(nullptr, TRUE, &pOutStream);
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
+
     hr = pEncoder->Initialize(pOutStream, WICBitmapEncoderNoCache);
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
 
     // 3. Create and init frame
     hr = pEncoder->CreateNewFrame(&pFrame, nullptr);
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
+
     hr = pFrame->Initialize(nullptr);
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
+
     hr = pFrame->SetSize(desc.Width, desc.Height);
-    if (FAILED(hr)) {
-        goto done;
-    }
-    WICPixelFormatGUID pixelFormatGuid = GUID_WICPixelFormat32bppRGBA;
+    if (FAILED(hr)) { goto end; }
+
     hr = pFrame->SetPixelFormat(&pixelFormatGuid);
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
 
     // 4. Write to stream
     hr = pFrame->WriteSource(pWicBitmap, nullptr);
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
 
     // 5. Commit changes
     hr = pFrame->Commit();
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
+
     hr = pEncoder->Commit();
-    if (FAILED(hr)) {
-        goto done;
-    }
+    if (FAILED(hr)) { goto end; }
 
     // 6. Get data from out stream
-    HGLOBAL hGlobal = nullptr;
-    GetHGlobalFromStream(pOutStream, &hGlobal);
-    char* jpegData = (char*)GlobalLock(hGlobal);
-    SIZE_T jpegSize = GlobalSize(hGlobal);
+    {
+        HGLOBAL hGlobal = nullptr;
+        GetHGlobalFromStream(pOutStream, &hGlobal);
+        char* jpegData = (char*)GlobalLock(hGlobal);
+        auto jpegSize = GlobalSize(hGlobal);
 
-    // 7. Send data to client
-    int bytesSent = send(clientSocket, (char*)&jpegSize, sizeof(int), 0);
-    bytesSent = send(clientSocket, jpegData, (int)jpegSize, 0);
-    if (bytesSent == 0 || bytesSent == SOCKET_ERROR) {
-        DWORD err = WSAGetLastError();
-        UNREFERENCED_PARAMETER(err);
-        hr = E_FAIL;
+        // 7. Send data to client
+        int bytesSent = send(clientSocket, (char*)&jpegSize, sizeof(int), 0);
+        bytesSent = send(clientSocket, jpegData, (int)jpegSize, 0);
+        if (bytesSent == 0 || bytesSent == SOCKET_ERROR) {
+            DWORD err = WSAGetLastError();
+            UNREFERENCED_PARAMETER(err);
+            hr = E_FAIL;
+        }
     }
     
-done:
+end:
     // --- END Create picture
     pDeviceContext->Unmap(pTexture, 0);
 

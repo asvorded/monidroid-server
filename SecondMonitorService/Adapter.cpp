@@ -2,20 +2,14 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 
-#include <winsock2.h>
-
 #include "Adapter.h"
 
-#include "../MonidroidInfo/Monidroid.h"
+#include "DebugOutput.h"
 
-void DebugPrint(const wchar_t* format, ...) {
-    wchar_t buffer[1024];
-    va_list args;
-    va_start(args, format);
-    vswprintf(buffer, 1024, format, args);
-    va_end(args);
-    OutputDebugStringW(buffer);
-}
+#include <windows.h>
+#include <swdevice.h>
+
+#include "../MonidroidInfo/Monidroid.h"
 
 VOID WINAPI
 CreationCallback(
